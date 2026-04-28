@@ -1,0 +1,23 @@
+int SENSOR = 2;   //Declaracion entero numero PIN del sensor IR
+int VALOR;         //Declaracion variable entero para almacenar valor del sensor IR
+int ANTERIOR = 1;   //Variable entero con valor 1, para almacenar valor anterior del sensor
+
+void setup () {
+Serial.begin (9600);    //Inicializacion de monitor serial
+pinMode (SENSOR, INPUT) ;   //Inicializacion SENSOR IR en PIN 2
+}
+
+void loop () {
+  VALOR = digitalRead (SENSOR);   //Valor actual del sensor
+  if (VALOR != ANTERIOR) {        //Cuando el valor cambia, se inicializa la confirmacion
+    if (VALOR == HIGH)            //Si el valor del sensor IR es alto;
+      Serial.println("Linea");    //Esta sobre la linea, escribe en el monitor serial "Linea"
+    else
+      Serial.println("Fuera");    //Si no, esta por fuera, escribe en el monitor serial "Fuera"
+  ANTERIOR = VALOR;   //Almacena cual fue el ultimo estado (HIGH,LOW)
+
+  delay (500);      //Pausa de medio segundo (500ms)
+
+  }
+
+}
