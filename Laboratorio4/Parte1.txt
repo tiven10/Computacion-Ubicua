@@ -1,19 +1,43 @@
+// Variable donde se guarda la lectura cruda del sensor analógico
 int SENSOR;
+
+// Variable donde se almacena la temperatura calculada en cada lectura
 float TEMPERATURA;
+
+// Variable acumuladora para sumar varias mediciones y luego promediarlas
 float SUMA;
 
 void setup() {
+  // Inicia la comunicación serial a 9600 baudios
+  // Esto permite ver los datos en el monitor serial
   Serial.begin(9600);
 }
 
 void loop() {
+
+  // Se reinicia la suma en cada ciclo del loop
+  // Esto es importante para no acumular datos anteriores
   SUMA = 0;
+
+  // Se realizan 5 lecturas del sensor para sacar un promedio más estable
   for (int i = 0; i < 5; i++) {
+
+    // Lectura del valor analógico del pin A0 (sensor de temperatura)
     SENSOR = analogRead(A0);
+
+    // Conversión del valor leído a temperatura
+    // Se convierte de 0-1023 a milivoltios (0-5000 mV)
+    // Luego se divide entre 10 para obtener temperatura aproximada en °C
     TEMPERATURA = ((SENSOR * 5000.0) / 1023) / 10;
+
+    // Se suma cada lectura de temperatura para luego promediar
     SUMA = TEMPERATURA + SUMA;
+
+    // Pequeña pausa entre lecturas para estabilidad del sensor
     delay(500);
   }
-  
-  Serial.println(SUMA/5.0, 1);
+
+  // Se imprime el promedio de las 5 lecturas en el monitor serial
+  // Se divide entre 5 para obtener el valor final estable
+  Serial.println(SUMA / 5.0, 1);
 }
