@@ -1,0 +1,173 @@
+// ROBOT EVASOR DE OBSTÁCULOS
+
+// Pines del motor A
+const int dirA = 12; // Dirección motor A
+const int pwmA = 3;  // Velocidad motor A
+
+// Pines del motor B
+const int dirB = 13; // Dirección motor B
+const int pwmB = 11; // Velocidad motor B
+
+// Pines del sensor ultrasónico
+const int trig = 7; // Trigger del sensor
+const int echo = 8; // Echo del sensor
+
+// Variable para guardar la distancia
+int distancia;
+
+void setup() {
+
+  // Configurar pines de motores como salida
+  pinMode(dirA, OUTPUT);
+  pinMode(pwmA, OUTPUT);
+
+  pinMode(dirB, OUTPUT);
+  pinMode(pwmB, OUTPUT);
+
+  // Configurar sensor ultrasónico
+  pinMode(trig, OUTPUT);
+  pinMode(echo, INPUT);
+
+  // Iniciar monitor serial
+  Serial.begin(9600);
+
+  // Generar números aleatorios
+  randomSeed(analogRead(A1));
+}
+
+void loop() {
+
+  // Leer distancia del sensor
+  distancia = DistanciaCM();
+
+  // Mostrar distancia en pantalla
+  Serial.print("Distancia: ");
+  Serial.println(distancia);
+
+  // Si hay un obstáculo cerca
+  if (distancia <= 15) {
+
+    parar(400); // Detener robot
+
+    atras(250,250,300); // Retroceder
+
+    Serial.print("Atras: ");
+
+    parar(400); // Pausa
+
+    // Elegir dirección aleatoria
+    if (random(0,3) == 0) {
+
+      derecha(250,250,300); // Girar derecha
+      Serial.print("Derecha: ");
+
+      parar(400);
+
+    } else {
+
+      izquierda(250,250,300); // Girar izquierda
+      Serial.print("Izquierda: ");
+
+      parar(400);
+    }
+
+    parar(400);
+  }
+
+  // Si el camino está libre
+  else {
+    adelante(250,250,200); // Avanzar
+  }
+}
+
+// Función para avanzar
+void adelante(int velIzq, int velDer, int tiempo) {
+
+  digitalWrite(dirA, HIGH); // Dirección motor A
+  digitalWrite(dirB, LOW);  // Dirección motor B
+
+  analogWrite(pwmA, velIzq); // Velocidad izquierda
+  analogWrite(pwmB, velDer); // Velocidad derecha
+
+  delay(tiempo); // Tiempo de movimiento
+}
+
+// Función para retroceder
+void atras(int velIzq, int velDer, int tiempo) {
+
+  digitalWrite(dirA, LOW);
+  digitalWrite(dirB, LOW);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+
+  delay(tiempo);
+}
+
+// Función para girar izquierda
+void izquierda(int velIzq, int velDer, int tiempo) {
+
+  digitalWrite(dirA, LOW);
+  digitalWrite(dirB, HIGH);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+
+  delay(tiempo);
+}
+
+// Función para girar derecha
+void derecha(int velIzq, int velDer, int tiempo) {
+
+  digitalWrite(dirA, HIGH);
+  digitalWrite(dirB, LOW);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+
+  delay(tiempo);
+}
+
+// Función para detener motores
+void parar(int tiempo) {
+
+  analogWrite(pwmA, 0); // Apagar motor A
+  analogWrite(pwmB, 0); // Apagar motor B
+
+  delay(tiempo);
+}
+
+// Función para medir distancia
+int DistanciaCM() {
+
+  long tiempoEco; // Tiempo del eco
+
+  digitalWrite(trig, LOW); // Limpiar trigger
+  delayMicroseconds(5);
+
+  digitalWrite(trig, HIGH); // Enviar pulso
+  delayMicroseconds(10);
+  digitalWrite(trig, LOW);
+
+  // Leer tiempo del eco
+  tiempoEco = pulseIn(echo, HIGH, 35000);
+
+  // Si no detecta eco
+  if (tiempoEco == 0) {
+
+    return 400;
+
+  }
+
+  // Convertir tiempo a centímetros
+  int distancia = tiempoEco / 58;
+
+  // Filtrar valores inválidos
+  if (distancia < 2 || distancia > 400) {
+
+    return 400;
+
+  }
+
+  return distancia; // Retornar distancia
+}

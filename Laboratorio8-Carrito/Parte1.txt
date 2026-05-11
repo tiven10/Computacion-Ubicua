@@ -1,0 +1,150 @@
+// -------- PINES DEL RECEPTOR RF --------
+
+// Botón para mover hacia adelante
+const int pinA = 4;
+
+// Botón para mover hacia atrás
+const int pinB = 2;
+
+// Botón para mover hacia la izquierda
+const int pinC = 8;
+
+// Botón para mover hacia la derecha
+const int pinD = 7;
+
+
+// -------- MOTORES (L298P) --------
+
+// Dirección del motor izquierdo
+const int dirA = 12;
+
+// Velocidad del motor izquierdo
+const int pwmA = 3;
+
+// Dirección del motor derecho
+const int dirB = 13;
+
+// Velocidad del motor derecho
+const int pwmB = 11;
+
+
+// -------- CONFIGURACIÓN --------
+void setup() {
+
+  // Configurar pines de motores como salida
+  pinMode(dirA, OUTPUT);
+  pinMode(pwmA, OUTPUT);
+
+  pinMode(dirB, OUTPUT);
+  pinMode(pwmB, OUTPUT);
+
+  // Configurar botones RF como entrada
+  pinMode(pinA, INPUT);
+  pinMode(pinB, INPUT);
+  pinMode(pinC, INPUT);
+  pinMode(pinD, INPUT);
+
+  // Iniciar monitor serial
+  Serial.begin(9600);
+}
+
+
+// -------- BUCLE PRINCIPAL --------
+void loop() {
+
+  // Leer estado de cada botón
+  int A = digitalRead(pinA);
+  int B = digitalRead(pinB);
+  int C = digitalRead(pinC);
+  int D = digitalRead(pinD);
+
+  // -------- CONTROL --------
+
+  // Si se presiona el botón C
+  if (C == HIGH) {
+
+    adelante(200, 200); // Avanzar
+    Serial.println("Adelante");
+  } 
+
+  // Si se presiona el botón D
+  else if (D == HIGH) {
+
+    atras(200, 200); // Retroceder
+    Serial.println("Atras");
+  } 
+
+  // Si se presiona el botón A
+  else if (A == HIGH) {
+
+    izquierda(200, 200); // Girar izquierda
+    Serial.println("Izquierda");
+  } 
+
+  // Si se presiona el botón B
+  else if (B == HIGH) {
+
+    derecha(200, 200); // Girar derecha
+    Serial.println("Derecha");
+  } 
+
+  // Si no se presiona ningún botón
+  else {
+
+    parar(); // Detener motores
+  }
+}
+
+
+// -------- FUNCIONES --------
+
+// Función para avanzar
+void adelante(int velIzq, int velDer) {
+
+  digitalWrite(dirA, HIGH); // Dirección motor izquierdo
+  digitalWrite(dirB, HIGH); // Dirección motor derecho
+
+  analogWrite(pwmA, velIzq); // Velocidad izquierda
+  analogWrite(pwmB, velDer); // Velocidad derecha
+}
+
+
+// Función para retroceder
+void atras(int velIzq, int velDer) {
+
+  digitalWrite(dirA, LOW);
+  digitalWrite(dirB, LOW);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+}
+
+
+// Función para girar izquierda
+void izquierda(int velIzq, int velDer) {
+
+  digitalWrite(dirA, LOW);
+  digitalWrite(dirB, HIGH);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+}
+
+
+// Función para girar derecha
+void derecha(int velIzq, int velDer) {
+
+  digitalWrite(dirA, HIGH);
+  digitalWrite(dirB, LOW);
+
+  analogWrite(pwmA, velIzq);
+  analogWrite(pwmB, velDer);
+}
+
+
+// Función para detener motores
+void parar() {
+
+  analogWrite(pwmA, 0); // Apagar motor izquierdo
+  analogWrite(pwmB, 0); // Apagar motor derecho
+}
