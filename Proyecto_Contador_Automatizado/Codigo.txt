@@ -1,0 +1,430 @@
+#include <LiquidCrystal_I2C.h>
+
+// =====================================================
+// Inicialización de pantalla LCD I2C
+// Dirección: 0x27
+// Tamaño: 16 columnas x 2 filas
+// =====================================================
+LiquidCrystal_I2C lcd(0x27,16,2);
+
+// =====================================================
+// Definición de pines
+// =====================================================
+const int waterSensorPin = 2; // Sensor de agua sin contacto
+const int irSensorPin = 3;    // Sensor IR para detectar vaso
+const int buzzerPin = 8;      // Buzzer para alertas sonoras
+
+// =====================================================
+// Variables principales
+// =====================================================
+
+// Contador total de vasos consumidos
+int glassCount = 0;
+
+// Evita múltiples conteos consecutivos del mismo vaso
+bool alreadyCounted = false;
+
+// =====================================================
+// Variables para recordatorios generales
+// =====================================================
+
+// Guarda el último tiempo del recordatorio
+unsigned long lastReminderTime = 0;
+
+// Activa/desactiva el recordatorio general
+bool reminderActive = true;
+
+// =====================================================
+// Variables de control visual y temporización
+// =====================================================
+
+// Control de actualización del LCD
+unsigned long lastLoopTime = 0;
+
+// =====================================================
+// Variables para verificación de vaso vacío
+// =====================================================
+
+// Tiempo inicial de verificación
+unsigned long checkStartTime = 0;
+
+// Indica si actualmente se verifica un vaso
+bool checkingGlass = false;
+
+// =====================================================
+// Variables para detección conjunta
+// (vaso + agua)
+// =====================================================
+
+// Tiempo cuando se detectó vaso con agua
+unsigned long detectionTime = 0;
+
+// Evita múltiples activaciones simultáneas
+bool bothDetected = false;
+
+// Activa recordatorios posteriores
+bool postDetectionReminderPending = false;
+
+// =====================================================
+// Permiso de conteo
+// Solo se puede contar si previamente
+// hubo vaso + agua válidos
+// =====================================================
+bool reminderModeEntered = false;
+
+// =====================================================
+// Meta diaria de hidratación
+// =====================================================
+int goal = 8;
+
+// =====================================================
+// Variables para buzzer repetitivo
+// =====================================================
+
+// Controla el intervalo entre sonidos
+unsigned long lastBeepTime = 0;
+
+// =====================================================
+// Verificador de estabilidad de sensores
+// =====================================================
+
+// Tiempo inicial de validación
+unsigned long verifyStartTime = 0;
+
+// Indica si se están validando ambos sensores
+bool verifyingBothSensors = false;
+
+
+// =====================================================
+// SETUP
+// Configuración inicial del sistema
+// =====================================================
+void setup() {
+
+  // Configuración de pines
+  pinMode(waterSensorPin, INPUT);
+  pinMode(irSensorPin, INPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  // Inicialización de comunicación serial
+  Serial.begin(9600);
+
+  // Inicialización LCD
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+
+  // Sonidos de inicio
+  powerOnTone();
+  delay(500);
+  activationTone();
+
+  lcd.setCursor(0,0);
+  lcd.print("Vaso: ");
+  lcd.print(glassCount);
+  lcd.print("   ");
+
+  lcd.setCursor(0,1);
+  lcd.print("Meta: ");
+  lcd.print(goal);
+  lcd.print("   ");
+
+}
+
+
+// =====================================================
+// LOOP PRINCIPAL
+// =====================================================
+void loop() {
+
+  // Tiempo actual del sistema
+  unsigned long currentMillis = millis();
+
+  // Lectura de sensores
+  int waterState = digitalRead(waterSensorPin); // HIGH = agua detectada
+  int irState = digitalRead(irSensorPin);       // LOW = vaso detectado
+
+  // =====================================================
+  // Recordatorio general
+  // Se ejecuta cada 3 segundos mientras
+  // el sistema espera un vaso con agua
+  // =====================================================
+  if (reminderActive && currentMillis - lastReminderTime >= 3000) {
+
+    reminderTone();
+
+    lastReminderTime = currentMillis;
+
+    Serial.println("🆕 Esperando vaso con agua");
+  }
+
+
+  // =====================================================
+  // Iniciar verificación cuando ambos sensores
+  // detectan simultáneamente
+  // =====================================================
+  if (irState == LOW &&
+      waterState == HIGH &&
+      !bothDetected &&
+      !verifyingBothSensors) {
+
+    Serial.println("🔍 Verificando vaso con agua...");
+
+    verifyingBothSensors = true;
+
+    verifyStartTime = currentMillis;
+  }
+
+
+  // =====================================================
+  // Confirmar estabilidad de detección
+  // Ambos sensores deben permanecer activos
+  // durante 2 segundos continuos
+  // =====================================================
+  if (verifyingBothSensors) {
+
+    // Cancelar si alguno deja de detectar
+    if (!(irState == LOW && waterState == HIGH)) {
+
+      Serial.println("❌ Verificacion cancelada");
+
+      verifyingBothSensors = false;
+    }
+
+    // Confirmar detección estable
+    else if (currentMillis - verifyStartTime >= 2000) {
+
+      Serial.println("✅ Vaso con agua confirmado");
+      Serial.println("⏱️ Recordatorio activado");
+
+      // Guardar tiempo de activación
+      detectionTime = currentMillis;
+
+      // Activar modo recordatorio
+      postDetectionReminderPending = true;
+
+      // Bloquear múltiples activaciones
+      bothDetected = true;
+
+      // Finalizar verificación
+      verifyingBothSensors = false;
+
+      // Permitir conteo posterior
+      reminderModeEntered = true;
+    }
+  }
+
+
+  // =====================================================
+  // Reset de detección conjunta
+  // =====================================================
+  if (!(irState == LOW && waterState == HIGH)) {
+
+    bothDetected = false;
+  }
+
+
+  // =====================================================
+  // Recordatorio continuo después de 5 segundos
+  // =====================================================
+  if (postDetectionReminderPending &&
+      currentMillis - detectionTime >= 5000) {
+
+    // Ejecutar sonido cada 1 segundo
+    if (currentMillis - lastBeepTime >= 1000) {
+
+      lastBeepTime = currentMillis;
+
+      Serial.println("🔔 Reminder: beber agua");
+
+      reminderTone();
+
+      // Detener recordatorio si ya no hay agua
+      if (waterState == LOW) {
+        lcd.setCursor(0,0);
+        lcd.print("Colocar");
+        lcd.setCursor(0,1);
+        lcd.print("Vaso Vacio");
+        postDetectionReminderPending = false;
+        reminderTone();
+      }
+    }
+  }
+
+
+  // =====================================================
+  // Detección de vaso vacío
+  // Solo funciona si previamente se activó
+  // el modo recordatorio
+  // =====================================================
+  if (irState == LOW &&
+      reminderModeEntered &&
+      !alreadyCounted &&
+      !checkingGlass) {
+
+    reminderActive = false;
+
+    checkingGlass = true;
+
+    checkStartTime = currentMillis;
+  }
+
+
+  // =====================================================
+  // Verificación de vaso vacío durante 3 segundos
+  // =====================================================
+  if (checkingGlass) {
+
+    // Cancelar si aparece agua
+    if (waterState == HIGH) {
+
+      checkingGlass = false;
+    }
+
+    // Confirmar ausencia de agua
+    else if (currentMillis - checkStartTime >= 3000) {
+
+      if (digitalRead(waterSensorPin) == LOW) {
+
+        // Incrementar contador
+        glassCount++;
+
+        // Bloquear nuevo conteo
+        reminderModeEntered = false;
+
+        alreadyCounted = true;
+
+        Serial.print("✅ Vaso contado! Total: ");
+        Serial.println(glassCount);
+
+        // Sonido de conteo
+        countTone();
+
+        lcd.setCursor(0,0);
+        lcd.print("Vaso: ");
+        lcd.print(glassCount);
+        lcd.print("   ");
+
+        lcd.setCursor(0,1);
+        lcd.print("Meta: ");
+        lcd.print(goal);
+        lcd.print("   ");
+
+  
+        // Confirmar bebida consumida
+        if (waterState == LOW) {
+
+          postDetectionReminderPending = false;
+
+          Serial.println("✅ Usuario bebió, rellenar");
+        }
+
+        // Reactivar reminder general
+        if (waterState == LOW) {
+
+          reminderActive = true;
+
+          lastReminderTime = currentMillis;
+        }
+
+        // Verificar meta alcanzada
+        if (glassCount >= goal) {
+
+          victoryTone();
+
+          glassCount = 0;
+
+          reminderActive = true;
+        }
+      }
+
+      checkingGlass = false;
+    }
+  }
+
+
+  // =====================================================
+  // Reset de permiso de conteo
+  // =====================================================
+  if (irState == HIGH || waterState == HIGH) {
+
+    alreadyCounted = false;
+  }
+}
+
+
+// =====================================================
+// FUNCIONES DE TONOS
+// =====================================================
+
+
+// -----------------------------------------------------
+// Sonido de encendido
+// -----------------------------------------------------
+void powerOnTone() {
+
+  tone(buzzerPin, 500, 200);
+  delay(250);
+
+  tone(buzzerPin, 700, 200);
+  delay(250);
+
+  noTone(buzzerPin);
+}
+
+
+// -----------------------------------------------------
+// Sonido de activación
+// -----------------------------------------------------
+void activationTone() {
+
+  tone(buzzerPin, 1000, 200);
+  delay(250);
+
+  tone(buzzerPin, 1500, 200);
+  delay(250);
+
+  noTone(buzzerPin);
+}
+
+
+// -----------------------------------------------------
+// Sonido de recordatorio
+// -----------------------------------------------------
+void reminderTone() {
+
+  tone(buzzerPin, 400, 150);
+  delay(150);
+
+  noTone(buzzerPin);
+}
+
+
+// -----------------------------------------------------
+// Sonido de conteo exitoso
+// -----------------------------------------------------
+void countTone() {
+
+  tone(buzzerPin, 800, 200);
+  delay(250);
+
+  noTone(buzzerPin);
+}
+
+
+// -----------------------------------------------------
+// Sonido de meta completada
+// -----------------------------------------------------
+void victoryTone() {
+
+  tone(buzzerPin, 800, 150);
+  delay(200);
+
+  tone(buzzerPin, 1000, 150);
+  delay(200);
+
+  tone(buzzerPin, 1200, 200);
+  delay(250);
+
+  noTone(buzzerPin);
+}
